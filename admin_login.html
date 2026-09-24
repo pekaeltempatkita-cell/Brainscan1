@@ -33,7 +33,7 @@
         try {
           const data = await NeuroCheckAPI.adminLogin(fd.get("username"), fd.get("password"));
           NeuroCheckAPI.setToken(data.token);
-          window.location.href = "admin-dashboard.html";
+          window.location.href = "admin_dashboard.html";
         } catch (err) {
           document.getElementById("errorBox").innerHTML = `<div class="alert-error">${err.message}</div>`;
         }
