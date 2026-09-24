@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Detail Pasien - NeuroCheck</title>
+  <link rel="stylesheet" href="index.css">
+  <script src="config.js"></script>
+  <script src="api.js"></script>
+  <script src="auth.js"></script>
+</head>
+<body>
+  <div id="nav-placeholder"></div>
+  <div class="container" style="padding-top:24px; padding-bottom:0;">
+    <div style="margin-bottom:16px;">
+      <a href="dashboard.html" class="btn btn-outline btn-sm">&larr; Kembali ke Dashboard</a>
+    </div>
+    <div class="card" id="patientHeader">
+      <p style="color:var(--text-muted);">Memuat data pasien...</p>
+    </div>
+    <div id="messageBox"></div>
+    <div id="resultBox"></div>
+  </div>
+
+  <div class="page-grid">
+    <div>
+      <div class="card">
+        <div class="card-title-row">
+          <div class="card-icon-circle">&#9729;</div>
+          <h2 style="margin:0;">Unggah Hasil Scan Otak</h2>
+        </div>
+        <p style="color:var(--text-muted); margin-top:0;">Unggah file gambar MRI atau CT dalam format JPG atau PNG.</p>
+
+        <form id="uploadForm">
+          <div class="dropzone" data-dropzone>
+            <div class="dz-icon">&#9729;&#8593;</div>
+            <div><strong>Seret dan lepas file di sini</strong></div>
+            <div style="color:var(--text-muted); font-size:0.85rem; margin:6px 0;">atau</div>
+            <span class="btn btn-primary btn-sm">Pilih File</span>
+            <input type="file" name="file" accept="image/*" required style="display:none;">
+            <div class="dz-filename" data-filename style="display:none;"></div>
+            <div class="dz-hint">Format: JPG, PNG &nbsp;|&nbsp; Maks. ukuran 10 MB</div>
+          </div>
+
+          <div style="margin-top:24px;">
+            <div class="card-title-row">
+              <div class="card-icon-circle" style="font-size:0.95rem;">&#128100;</div>
+              <h3 style="margin:0;">Informasi Tambahan</h3>
+            </div>
+            <div class="form-row-3">
+              <div class="form-group">
+                <label>Jenis Scan</label>
+                <select name="jenis_scan">
+                  <option value="">Pilih jenis scan</option>
+                  <option value="MRI">MRI</option>
+                  <option value="CT-Scan">CT-Scan</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Umur Saat Scan</label>
+                <input type="number" name="umur_saat_scan" placeholder="Contoh: 45" min="0" max="130">
+              </div>
+              <div class="form-group">
+                <label>Gejala (opsional)</label>
+                <input type="text" name="gejala" placeholder="Contoh: sakit kepala, gangguan penglihatan">
+              </div>
+            </div>
+          </div>
+
+          <button type="submit" id="uploadBtn" class="btn btn-primary" style="width:100%; margin-top:8px;">&#128269; Mulai Prediksi</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Rekam Medis / Riwayat Pemeriksaan</h2>
+        <div class="table-responsive">
+          <table class="styled">
+            <thead><tr><th>Tanggal</th><th>Hasil</th><th>Confidence</th><th>Laporan</th></tr></thead>
+            <tbody id="recordsBody">
+              <tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Memuat...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="sidebar-card">
+        <div class="card-title-row">
+          <div class="card-icon-circle">&#129504;</div>
+          <h3 style="margin:0;">10 Kelas Penyakit Otak</h3>
+        </div>
+        <div class="class-list">
+          <div class="class-item"><span class="class-badge" style="background:#3b82f6">1</span> Alzheimer Mild</div>
+          <div class="class-item"><span class="class-badge" style="background:#8b5cf6">2</span> Alzheimer Moderate</div>
+          <div class="class-item"><span class="class-badge" style="background:#14b8a6">3</span> Alzheimer Very Mild</div>
+          <div class="class-item"><span class="class-badge" style="background:#f59e0b">4</span> Intracranial Hemorrhage</div>
+          <div class="class-item"><span class="class-badge" style="background:#ec4899">5</span> Multiple Sclerosis</div>
+          <div class="class-item"><span class="class-badge" style="background:#10b981">6</span> Normal / Sehat</div>
+          <div class="class-item"><span class="class-badge" style="background:#f97316">7</span> Stroke Iskemik</div>
+          <div class="class-item"><span class="class-badge" style="background:#ef4444">8</span> Tumor Glioma</div>
+          <div class="class-item"><span class="class-badge" style="background:#db2777">9</span> Tumor Meningioma</div>
+          <div class="class-item"><span class="class-badge" style="background:#64748b">10</span> Tumor Pituitary</div>
+        </div>
+      </div>
+      <div class="alert-info">Pastikan file scan yang diunggah berkualitas baik agar hasil prediksi lebih akurat.</div>
+    </div>
+  </div>
+
+  <div class="footer">&copy; 2026 NeuroCheck. All rights reserved.</div>
+  <script src="app.js"></script>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const nik = params.get("nik");
+
+    function urgencyClass(urgensi) {
+      if (!urgensi) return "urgency-rutin";
+      if (urgensi.includes("TINGGI")) return "urgency-tinggi";
+      if (urgensi.toLowerCase().includes("sedang")) return "urgency-sedang";
+      return "urgency-rutin";
+    }
+
+    function renderRecords(records) {
+      const body = document.getElementById("recordsBody");
+      if (!records.length) {
+        body.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Belum ada riwayat pemeriksaan.</td></tr>';
+        return;
+      }
+      body.innerHTML = records.map(r => `
+        <tr>
+          <td>${r.created_at || "-"}</td>
+          <td>${r.prediction_label || "Bukan citra otak"}</td>
+          <td>${r.prediction_confidence ? (r.prediction_confidence * 100).toFixed(1) + "%" : "-"}</td>
+          <td>${r.prediction_id ? `<a href="${NeuroCheckAPI.reportUrl(nik, r.prediction_id)}" target="_blank" class="btn btn-outline btn-sm">Unduh PDF</a>` : "-"}</td>
+        </tr>`).join("");
+    }
+
+    async function loadPatient() {
+      try {
+        const data = await NeuroCheckAPI.getPatient(nik);
+        const p = data.patient;
+        document.getElementById("patientHeader").innerHTML = `
+          <h2 style="margin-bottom:6px;">${p.nama}</h2>
+          <p style="color:var(--text-muted); margin:0 0 6px; font-size:0.92rem;">NIK: ${p.nik} &nbsp;|&nbsp; Tgl Lahir: ${p.tanggal_lahir || "-"} &nbsp;|&nbsp; ${p.jenis_kelamin || "-"}</p>
+          <p style="color:var(--text-muted); margin:0; font-size:0.9rem;">Alamat: ${p.alamat || "-"} &nbsp;|&nbsp; Telp: ${p.no_telepon || "-"}</p>`;
+        renderRecords(data.records || []);
+      } catch (err) {
+        document.getElementById("patientHeader").innerHTML =
+          `<div class="alert-error">Gagal memuat data pasien: ${err.message}</div>`;
+      }
+    }
+
+    function renderResult(result) {
+      const box = document.getElementById("resultBox");
+      if (!result.valid) {
+        box.innerHTML = `<div class="alert-error">Gambar terdeteksi <strong>BUKAN citra MRI/CT otak</strong>
+          (confidence deteksi otak: ${(result.precheck_confidence * 100).toFixed(1)}%). Coba unggah ulang gambar yang lebih jelas.</div>`;
+        return;
+      }
+      const info = result.disease_info || result.info || {};
+      box.innerHTML = `
+        <div class="result-panel">
+          <div class="result-header">
+            <div>
+              <div style="font-size:0.8rem; color:var(--text-muted); font-weight:700;">HASIL ANALISIS AI</div>
+              <div class="result-label">${info.nama_tampilan || result.prediction_label}</div>
+            </div>
+            <div style="text-align:right;">
+              <span class="urgency-badge ${urgencyClass(info.urgensi)}">${info.urgensi || ""}</span>
+              <div style="margin-top:8px;">
+                <a href="${NeuroCheckAPI.reportUrl(nik, result.prediction_id)}" target="_blank" class="btn btn-primary btn-sm">&#8659; Unduh Laporan (PDF)</a>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:var(--text-muted);">
+              <span>Tingkat Keyakinan</span><span><strong>${(result.prediction_confidence * 100).toFixed(2)}%</strong></span>
+            </div>
+            <div class="confidence-bar-track"><div class="confidence-bar-fill" style="width:${result.prediction_confidence * 100}%"></div></div>
+          </div>
+          <div class="result-grid">
+            <div class="result-section"><h4>Ringkasan Temuan</h4><ul>${(info.temuan || []).map(t => `<li>${t}</li>`).join("")}</ul></div>
+            <div class="result-section"><h4>Rekomendasi</h4><ul>${(info.rekomendasi || []).map(r => `<li>${r}</li>`).join("")}</ul></div>
+          </div>
+          ${result.gemini_explanation ? `<div class="result-section"><h4>Penjelasan &amp; Langkah Selanjutnya</h4><p style="color:var(--text-muted); font-size:0.9rem; line-height:1.7;">${result.gemini_explanation}</p></div>` : ""}
+          <p style="font-size:0.78rem; color:var(--text-muted); margin-top:16px;">Hasil ini adalah opini AI sebagai alat bantu skrining awal, BUKAN diagnosis final. Wajib dikonfirmasi oleh dokter/radiolog yang berwenang.</p>
+        </div>`;
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      if (!NeuroCheckAuth.requireLogin()) return;
+      NeuroCheckAuth.renderNav();
+
+      if (!nik) {
+        document.getElementById("patientHeader").innerHTML = '<div class="alert-error">NIK pasien tidak ditemukan di URL.</div>';
+        return;
+      }
+      loadPatient();
+
+      document.getElementById("uploadForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const fileInput = e.target.querySelector('input[type=file]');
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        const btn = document.getElementById("uploadBtn");
+        btn.disabled = true;
+        btn.textContent = "Menganalisis...";
+        document.getElementById("messageBox").innerHTML = "";
+
+        const extra = {
+          jenis_scan: e.target.jenis_scan.value,
+          umur_saat_scan: e.target.umur_saat_scan.value,
+          gejala: e.target.gejala.value,
+        };
+
+        try {
+          const result = await NeuroCheckAPI.uploadScan(nik, file, extra);
+          renderResult(result);
+          loadPatient();
+        } catch (err) {
+          document.getElementById("messageBox").innerHTML = `<div class="alert-error">Gagal menganalisis: ${err.message}</div>`;
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "\u{1F50D} Mulai Prediksi";
+        }
+      });
+    });
+  </script>
+</body>
+</html>
