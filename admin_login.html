@@ -1,30 +1,44 @@
 <!DOCTYPE html>
 <html lang="id">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login Admin - NeuroCheck</title>
-    <link rel="stylesheet" href="/static/index.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login Admin - NeuroCheck</title>
+  <link rel="stylesheet" href="index.css">
+  <script src="config.js"></script>
+  <script src="api.js"></script>
+  <script src="auth.js"></script>
 </head>
-
 <body>
-    {% set active = 'admin_login' %}
-    {% include "_nav.html" %}
-
-    <div class="container" style="max-width:420px; padding-top:40px; padding-bottom:40px;">
-        <div class="card">
-            <h2 style="margin-bottom:16px;">Login Admin</h2>
-            {% if error %}<div class="alert-info" style="background:#fdeaea;border-color:#f7c9c9;color:#b3261e;">{{
-                error }}</div>{% endif %}
-            <form method="post" action="/admin/login">
-                <div class="form-group"><label>Username</label><input type="text" name="username" required placeholder="Masukkan username admin"></div>
-                <div class="form-group"><label>Password</label><input type="password" name="password" required placeholder="Masukkan password"></div>
-                <button type="submit" class="btn btn-primary" style="width:100%; margin-top:8px;">Login</button>
-            </form>
-        </div>
+  <div id="nav-placeholder"></div>
+  <div class="container" style="max-width:420px; padding-top:40px; padding-bottom:40px;">
+    <div class="card">
+      <h2 style="margin-bottom:16px;">Login Admin</h2>
+      <div id="errorBox"></div>
+      <form id="adminLoginForm">
+        <div class="form-group"><label>Username</label><input type="text" name="username" required placeholder="Masukkan username admin"></div>
+        <div class="form-group"><label>Password</label><input type="password" name="password" required placeholder="Masukkan password"></div>
+        <button type="submit" class="btn btn-primary" style="width:100%; margin-top:8px;">Login</button>
+      </form>
     </div>
-    <div class="footer">&copy; 2026 NeuroCheck. All rights reserved.</div>
-</body>
+  </div>
+  <div class="footer">&copy; 2026 NeuroCheck. All rights reserved.</div>
 
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      NeuroCheckAuth.renderNav();
+      document.getElementById("adminLoginForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        try {
+          const data = await NeuroCheckAPI.adminLogin(fd.get("username"), fd.get("password"));
+          NeuroCheckAPI.setToken(data.token);
+          window.location.href = "admin-dashboard.html";
+        } catch (err) {
+          document.getElementById("errorBox").innerHTML = `<div class="alert-error">${err.message}</div>`;
+        }
+      });
+    });
+  </script>
+</body>
 </html>
