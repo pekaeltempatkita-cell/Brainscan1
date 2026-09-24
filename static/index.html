@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>NeuroCheck - Brain Disease Detection</title>
+
+    <link rel="stylesheet" href="index.css">
+
+    <!-- Konfigurasi Backend -->
+    <script src="config.js"></script>
+    <script src="api.js"></script>
+</head>
+
+<body>
+
+    <main class="container">
+
+        <header>
+            <img src="logo.png" alt="NeuroCheck" class="logo">
+
+            <h1>NeuroCheck</h1>
+            <p>Brain Disease Detection System</p>
+        </header>
+
+        <section class="upload-section">
+
+            <h2>Upload Scan Otak</h2>
+
+            <p>
+                Upload gambar scan otak untuk melakukan pemeriksaan
+                menggunakan sistem NeuroCheck.
+            </p>
+
+            <input
+                type="file"
+                id="brainFile"
+                accept="image/*"
+            >
+
+            <button id="predictButton">
+                Mulai Prediksi
+            </button>
+
+            <div id="loading" style="display:none;">
+                Memproses gambar...
+            </div>
+
+            <div id="result"></div>
+
+        </section>
+
+    </main>
+
+    <script>
+        const fileInput = document.getElementById("brainFile");
+        const predictButton = document.getElementById("predictButton");
+        const loading = document.getElementById("loading");
+        const result = document.getElementById("result");
+
+        predictButton.addEventListener("click", async () => {
+
+            const file = fileInput.files[0];
+
+            if (!file) {
+                result.textContent = "Silakan pilih gambar terlebih dahulu.";
+                return;
+            }
+
+            loading.style.display = "block";
+            result.textContent = "";
+
+            try {
+
+                const data = await NeuroCheckAPI.predict(file);
+
+                console.log("Hasil prediksi:", data);
+
+                result.innerHTML = `
+                    <h3>Hasil Prediksi</h3>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+
+            } catch (error) {
+
+                console.error(error);
+
+                result.textContent =
+                    "Gagal menghubungi backend: " + error.message;
+
+            } finally {
+
+                loading.style.display = "none";
+
+            }
+        });
+    </script>
+
+</body>
+</html>
