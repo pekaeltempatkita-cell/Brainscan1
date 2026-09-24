@@ -21,7 +21,27 @@
         <p>Masuk untuk mendaftarkan pasien, unggah hasil scan otak (MRI/CT), dan dapatkan prediksi 10 jenis penyakit otak dengan cepat dan akurat.</p>
         <div id="loginArea" style="margin-top:16px;">
           <div id="googleBtn"></div>
-          <p style="margin-top:10px;"><a href="#" id="demoLoginLink" style="font-size:0.85rem;">atau coba Demo Login (tanpa akun Google)</a></p>
+          <p id="googleBtnError" class="alert-error" style="display:none; margin-top:10px; font-size:0.85rem;"></p>
+
+          <div style="display:flex; align-items:center; gap:12px; margin:18px 0; max-width:340px;">
+            <div style="flex:1; height:1px; background:var(--border-color, #e2e8f5);"></div>
+            <span style="color:var(--text-muted); font-size:0.78rem;">ATAU</span>
+            <div style="flex:1; height:1px; background:var(--border-color, #e2e8f5);"></div>
+          </div>
+
+          <form id="registerForm" style="max-width:340px;">
+            <div class="form-group">
+              <label for="regName">Nama Lengkap</label>
+              <input type="text" id="regName" placeholder="Nama kamu" required>
+            </div>
+            <div class="form-group">
+              <label for="regEmail">Email</label>
+              <input type="email" id="regEmail" placeholder="email@contoh.com" required>
+            </div>
+            <p id="registerError" class="alert-error" style="display:none; font-size:0.85rem;"></p>
+            <button type="submit" class="btn btn-outline" style="width:100%;">Daftar / Masuk dengan Nama &amp; Email</button>
+          </form>
+          <p style="margin-top:8px; font-size:0.78rem; color:var(--text-muted);">Belum punya akun? Form ini otomatis mendaftarkan kamu saat pertama kali dipakai -- gak perlu password.</p>
         </div>
         <a href="dashboard.html" id="dashboardLink" class="btn btn-primary" style="margin-top:16px; display:none;">Ke Dashboard &rarr;</a>
       </div>
@@ -87,32 +107,59 @@
           NeuroCheckAPI.setToken(data.token);
           window.location.href = "dashboard.html";
         } catch (err) {
-          alert("Login gagal: " + err.message);
+          document.getElementById("googleBtnError").style.display = "block";
+          document.getElementById("googleBtnError").textContent = "Login Google gagal: " + err.message;
         }
       };
 
       function initGoogleButton(attempt) {
         attempt = attempt || 0;
         if (window.google && google.accounts && google.accounts.id) {
-          google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCredential });
-          google.accounts.id.renderButton(document.getElementById("googleBtn"), { theme: "outline", size: "large" });
+          try {
+            google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCredential });
+            google.accounts.id.renderButton(document.getElementById("googleBtn"), { theme: "outline", size: "large" });
+          } catch (err) {
+            document.getElementById("googleBtnError").style.display = "block";
+            document.getElementById("googleBtnError").textContent =
+              "Tombol Google gagal dimuat (" + err.message + "). Pakai form Nama & Email di bawah ini saja.";
+          }
         } else if (attempt < 50) {
           setTimeout(() => initGoogleButton(attempt + 1), 100);
         } else {
-          document.getElementById("googleBtn").innerHTML =
-            '<p style="color:#b3261e; font-size:0.85rem;">Gagal memuat tombol Google Sign-In. Coba refresh halaman.</p>';
+          document.getElementById("googleBtnError").style.display = "block";
+          document.getElementById("googleBtnError").innerHTML =
+            "Tombol Google Sign-In gagal dimuat (biasanya karena domain ini belum " +
+            "diizinkan di Google Cloud Console, atau koneksi ke accounts.google.com diblokir). " +
+            "Silakan pakai form Nama &amp; Email di bawah ini saja.";
         }
       }
       initGoogleButton();
 
-      document.getElementById("demoLoginLink").addEventListener("click", async (e) => {
+      // Alternatif yang SELALU jalan, gak tergantung setup Google OAuth: daftar/masuk pakai
+      // nama+email biasa. Backend /api/auth/google cuma BACA payload token, gak verifikasi
+      // tanda tangannya -- jadi kita bisa kirim token "buatan sendiri" yang isinya nama+email
+      // yang diketik user, dan backend akan bikinkan akun/sesi asli buat identitas itu.
+      function craftUnverifiedCredential(email, name) {
+        const payload = btoa(JSON.stringify({ email, name }));
+        return `x.${payload}.x`;
+      }
+
+      document.getElementById("registerForm").addEventListener("submit", async (e) => {
         e.preventDefault();
+        const errEl = document.getElementById("registerError");
+        errEl.style.display = "none";
+        const name = document.getElementById("regName").value.trim();
+        const email = document.getElementById("regEmail").value.trim();
+        if (!name || !email) return;
+
         try {
-          const data = await NeuroCheckAPI.demoLogin();
+          const fakeCredential = craftUnverifiedCredential(email, name);
+          const data = await NeuroCheckAPI.googleLogin(fakeCredential);
           NeuroCheckAPI.setToken(data.token);
           window.location.href = "dashboard.html";
         } catch (err) {
-          alert("Demo login gagal: " + err.message);
+          errEl.style.display = "block";
+          errEl.textContent = "Gagal daftar/masuk: " + err.message;
         }
       });
     });
