@@ -54,3 +54,6 @@ document.addEventListener("DOMContentLoaded", () => {
         el.style.width = pct + "%";
     });
 });
+
+// Cloud Run integration test helper.
+// In the browser console run: NeuroCheckAPI.health()
