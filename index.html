@@ -91,10 +91,19 @@
         }
       };
 
-      if (window.google && google.accounts && google.accounts.id) {
-        google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCredential });
-        google.accounts.id.renderButton(document.getElementById("googleBtn"), { theme: "outline", size: "large" });
+      function initGoogleButton(attempt) {
+        attempt = attempt || 0;
+        if (window.google && google.accounts && google.accounts.id) {
+          google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCredential });
+          google.accounts.id.renderButton(document.getElementById("googleBtn"), { theme: "outline", size: "large" });
+        } else if (attempt < 50) {
+          setTimeout(() => initGoogleButton(attempt + 1), 100);
+        } else {
+          document.getElementById("googleBtn").innerHTML =
+            '<p style="color:#b3261e; font-size:0.85rem;">Gagal memuat tombol Google Sign-In. Coba refresh halaman.</p>';
+        }
       }
+      initGoogleButton();
 
       document.getElementById("demoLoginLink").addEventListener("click", async (e) => {
         e.preventDefault();
