@@ -30,7 +30,7 @@
   }
 
   function requireAdmin(redirectTo) {
-    const session = requireLogin(redirectTo || "admin-login.html");
+    const session = requireLogin(redirectTo || "admin_login.html");
     if (session && session.role !== "admin") { window.location.href = "index.html"; return null; }
     return session;
   }
@@ -47,13 +47,13 @@
 
     let right = "";
     if (session && session.role === "admin") {
-      right = `<a href="admin-dashboard.html" class="btn btn-outline btn-sm">Dashboard Admin</a>
+      right = `<a href="admin_dashboard.html" class="btn btn-outline btn-sm">Dashboard Admin</a>
                <a href="#" id="navLogout" class="btn btn-outline btn-sm">Logout</a>`;
     } else if (session) {
       right = `<span style="color:var(--text-muted); font-size:0.88rem;">${session.email || ""}</span>
                <a href="#" id="navLogout" class="btn btn-outline btn-sm">Logout</a>`;
     } else {
-      right = `<a href="admin-login.html" class="btn btn-outline btn-sm">Login Admin</a>
+      right = `<a href="admin_login.html" class="btn btn-outline btn-sm">Login Admin</a>
                <a href="index.html#login" class="btn btn-primary btn-sm">Masuk dengan Google &rarr;</a>`;
     }
 
