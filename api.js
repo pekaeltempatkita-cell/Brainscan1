@@ -3,7 +3,7 @@
   "use strict";
 
   window.NeuroCheckAPI = {
-    baseUrl: window.API_BASE_URL || "https://brainscan2-349786493495.asia-southeast1.run.app",
+    baseUrl: window.API_BASE_URL || "https://brainscan2-1.ai.studio",
 
     getToken() {
       return localStorage.getItem("neurocheck_token") || "";
