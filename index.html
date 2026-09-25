@@ -82,25 +82,10 @@
     // Lebih tahan banting: browser HP, mode privasi, atau jaringan kantor/sekolah yang
     // sering memblokir cookie pihak ketiga / iframe Google tidak akan menggagalkan ini
     // secara diam-diam, karena ini navigasi halaman biasa ke accounts.google.com.
+    // Fungsi pemicu login (startGoogleLogin) & penentu redirect_uri sekarang ada di
+    // auth.js (dipakai bareng sama tombol Google di navbar semua halaman).
     function getRedirectUri() {
-      // Balik ke index.html di folder yang sama, apa pun sub-path GitHub Pages-nya.
-      return window.location.origin + window.location.pathname.replace(/[^/]*$/, "") + "index.html";
-    }
-
-    function startGoogleRedirectLogin() {
-      if (!GOOGLE_CLIENT_ID) {
-        alert("GOOGLE_CLIENT_ID belum diisi di config.js.");
-        return;
-      }
-      const params = new URLSearchParams({
-        client_id: GOOGLE_CLIENT_ID,
-        redirect_uri: getRedirectUri(),
-        response_type: "id_token",
-        scope: "openid email profile",
-        nonce: Math.random().toString(36).slice(2) + Date.now(),
-        prompt: "select_account",
-      });
-      window.location.href = "https://accounts.google.com/o/oauth2/v2/auth?" + params.toString();
+      return NeuroCheckAuth.getGoogleRedirectUri();
     }
 
     // Setelah Google redirect balik ke sini, id_token-nya nempel di URL fragment (#id_token=...)
@@ -153,7 +138,7 @@
         return;
       }
 
-      document.getElementById("googleRedirectBtn").addEventListener("click", startGoogleRedirectLogin);
+      document.getElementById("googleRedirectBtn").addEventListener("click", NeuroCheckAuth.startGoogleLogin);
 
       // Tombol resmi Google (opsional) -- kalau berhasil dimuat, ditampilkan SEBAGAI
       // TAMBAHAN di bawah tombol redirect, bukan pengganti. Kalau gagal load/gagal init,
