@@ -20,28 +20,15 @@
         <h1>Deteksi Dini, Lindungi<br>Kesehatan Otak Anda</h1>
         <p>Masuk untuk mendaftarkan pasien, unggah hasil scan otak (MRI/CT), dan dapatkan prediksi 10 jenis penyakit otak dengan cepat dan akurat.</p>
         <div id="loginArea" style="margin-top:16px;">
-          <div id="googleBtn"></div>
-          <p id="googleBtnError" class="alert-error" style="display:none; margin-top:10px; font-size:0.85rem;"></p>
-
-          <div style="display:flex; align-items:center; gap:12px; margin:18px 0; max-width:340px;">
-            <div style="flex:1; height:1px; background:var(--border-color, #e2e8f5);"></div>
-            <span style="color:var(--text-muted); font-size:0.78rem;">ATAU</span>
-            <div style="flex:1; height:1px; background:var(--border-color, #e2e8f5);"></div>
-          </div>
-
-          <form id="registerForm" style="max-width:340px;">
-            <div class="form-group">
-              <label for="regName">Nama Lengkap</label>
-              <input type="text" id="regName" placeholder="Nama kamu" required>
-            </div>
-            <div class="form-group">
-              <label for="regEmail">Email</label>
-              <input type="email" id="regEmail" placeholder="email@contoh.com" required>
-            </div>
-            <p id="registerError" class="alert-error" style="display:none; font-size:0.85rem;"></p>
-            <button type="submit" class="btn btn-outline" style="width:100%;">Daftar / Masuk dengan Nama &amp; Email</button>
-          </form>
-          <p style="margin-top:8px; font-size:0.78rem; color:var(--text-muted);">Belum punya akun? Form ini otomatis mendaftarkan kamu saat pertama kali dipakai -- gak perlu password.</p>
+          <!-- Tombol utama: redirect penuh ke Google. Ini SELALU aktif dari awal,
+               tidak bergantung pada script Google berhasil dimuat atau tidak. -->
+          <button type="button" id="googleRedirectBtn" class="btn btn-primary">
+            Masuk dengan Google &rarr;
+          </button>
+          <!-- Tombol resmi Google (opsional, cuma tampil kalau script-nya berhasil dimuat) -->
+          <div id="googleBtn" style="margin-top:10px;"></div>
+          <p id="googleErrorMsg" style="color:#b3261e; font-size:0.85rem; margin-top:8px; display:none;"></p>
+          <p style="margin-top:10px;"><a href="#" id="demoLoginLink" style="font-size:0.85rem;">atau coba Demo Login (tanpa akun Google)</a></p>
         </div>
         <a href="dashboard.html" id="dashboardLink" class="btn btn-primary" style="margin-top:16px; display:none;">Ke Dashboard &rarr;</a>
       </div>
@@ -91,8 +78,73 @@
   <div class="footer">&copy; 2026 NeuroCheck. All rights reserved.</div>
 
   <script>
-    document.addEventListener("DOMContentLoaded", () => {
+    // --- Google Login pakai REDIRECT PENUH (bukan tombol iframe Google) ---
+    // Lebih tahan banting: browser HP, mode privasi, atau jaringan kantor/sekolah yang
+    // sering memblokir cookie pihak ketiga / iframe Google tidak akan menggagalkan ini
+    // secara diam-diam, karena ini navigasi halaman biasa ke accounts.google.com.
+    function getRedirectUri() {
+      // Balik ke index.html di folder yang sama, apa pun sub-path GitHub Pages-nya.
+      return window.location.origin + window.location.pathname.replace(/[^/]*$/, "") + "index.html";
+    }
+
+    function startGoogleRedirectLogin() {
+      if (!GOOGLE_CLIENT_ID) {
+        alert("GOOGLE_CLIENT_ID belum diisi di config.js.");
+        return;
+      }
+      const params = new URLSearchParams({
+        client_id: GOOGLE_CLIENT_ID,
+        redirect_uri: getRedirectUri(),
+        response_type: "id_token",
+        scope: "openid email profile",
+        nonce: Math.random().toString(36).slice(2) + Date.now(),
+        prompt: "select_account",
+      });
+      window.location.href = "https://accounts.google.com/o/oauth2/v2/auth?" + params.toString();
+    }
+
+    // Setelah Google redirect balik ke sini, id_token-nya nempel di URL fragment (#id_token=...)
+    async function handleGoogleRedirectReturn() {
+      if (!window.location.hash) return false;
+      const hashParams = new URLSearchParams(window.location.hash.slice(1));
+      const idToken = hashParams.get("id_token");
+      const oauthError = hashParams.get("error");
+
+      if (!idToken && !oauthError) return false;
+
+      // Bersihkan fragment dari address bar (biar gak nyangkut kalau di-refresh/dibagikan)
+      history.replaceState(null, "", window.location.pathname + window.location.search);
+
+      if (oauthError) {
+        showGoogleError(
+          "Google menolak permintaan login: " + oauthError +
+          ". Kemungkinan redirect_uri (" + getRedirectUri() + ") belum didaftarkan di Google Cloud Console."
+        );
+        return true;
+      }
+
+      try {
+        const data = await NeuroCheckAPI.googleLogin(idToken);
+        NeuroCheckAPI.setToken(data.token);
+        window.location.href = "dashboard.html";
+      } catch (err) {
+        showGoogleError("Login Google gagal: " + err.message);
+      }
+      return true;
+    }
+
+    function showGoogleError(message) {
+      const el = document.getElementById("googleErrorMsg");
+      el.textContent = message;
+      el.style.display = "block";
+    }
+
+    document.addEventListener("DOMContentLoaded", async () => {
       NeuroCheckAuth.renderNav();
+
+      // Kalau baru saja balik dari halaman login Google, proses itu dulu.
+      const handledRedirect = await handleGoogleRedirectReturn();
+      if (handledRedirect) return;
 
       const session = NeuroCheckAuth.getSession();
       if (session) {
@@ -101,14 +153,18 @@
         return;
       }
 
+      document.getElementById("googleRedirectBtn").addEventListener("click", startGoogleRedirectLogin);
+
+      // Tombol resmi Google (opsional) -- kalau berhasil dimuat, ditampilkan SEBAGAI
+      // TAMBAHAN di bawah tombol redirect, bukan pengganti. Kalau gagal load/gagal init,
+      // tombol redirect di atas tetap jalan normal tanpa terpengaruh sama sekali.
       window.handleGoogleCredential = async (response) => {
         try {
           const data = await NeuroCheckAPI.googleLogin(response.credential);
           NeuroCheckAPI.setToken(data.token);
           window.location.href = "dashboard.html";
         } catch (err) {
-          document.getElementById("googleBtnError").style.display = "block";
-          document.getElementById("googleBtnError").textContent = "Login Google gagal: " + err.message;
+          showGoogleError("Login gagal: " + err.message);
         }
       };
 
@@ -118,48 +174,25 @@
           try {
             google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCredential });
             google.accounts.id.renderButton(document.getElementById("googleBtn"), { theme: "outline", size: "large" });
-          } catch (err) {
-            document.getElementById("googleBtnError").style.display = "block";
-            document.getElementById("googleBtnError").textContent =
-              "Tombol Google gagal dimuat (" + err.message + "). Pakai form Nama & Email di bawah ini saja.";
+          } catch (e) {
+            console.warn("Tombol resmi Google gagal dirender (tidak masalah, tombol utama tetap jalan):", e);
           }
-        } else if (attempt < 50) {
+        } else if (attempt < 30) {
           setTimeout(() => initGoogleButton(attempt + 1), 100);
-        } else {
-          document.getElementById("googleBtnError").style.display = "block";
-          document.getElementById("googleBtnError").innerHTML =
-            "Tombol Google Sign-In gagal dimuat (biasanya karena domain ini belum " +
-            "diizinkan di Google Cloud Console, atau koneksi ke accounts.google.com diblokir). " +
-            "Silakan pakai form Nama &amp; Email di bawah ini saja.";
         }
+        // Kalau tetap gagal setelah 30 percobaan, cukup diam -- tombol redirect di atas
+        // sudah cukup buat login, jadi tidak perlu ditampilkan pesan error yang menakuti user.
       }
       initGoogleButton();
 
-      // Alternatif yang SELALU jalan, gak tergantung setup Google OAuth: daftar/masuk pakai
-      // nama+email biasa. Backend /api/auth/google cuma BACA payload token, gak verifikasi
-      // tanda tangannya -- jadi kita bisa kirim token "buatan sendiri" yang isinya nama+email
-      // yang diketik user, dan backend akan bikinkan akun/sesi asli buat identitas itu.
-      function craftUnverifiedCredential(email, name) {
-        const payload = btoa(JSON.stringify({ email, name }));
-        return `x.${payload}.x`;
-      }
-
-      document.getElementById("registerForm").addEventListener("submit", async (e) => {
+      document.getElementById("demoLoginLink").addEventListener("click", async (e) => {
         e.preventDefault();
-        const errEl = document.getElementById("registerError");
-        errEl.style.display = "none";
-        const name = document.getElementById("regName").value.trim();
-        const email = document.getElementById("regEmail").value.trim();
-        if (!name || !email) return;
-
         try {
-          const fakeCredential = craftUnverifiedCredential(email, name);
-          const data = await NeuroCheckAPI.googleLogin(fakeCredential);
+          const data = await NeuroCheckAPI.demoLogin();
           NeuroCheckAPI.setToken(data.token);
           window.location.href = "dashboard.html";
         } catch (err) {
-          errEl.style.display = "block";
-          errEl.textContent = "Gagal daftar/masuk: " + err.message;
+          alert("Demo login gagal: " + err.message);
         }
       });
     });
