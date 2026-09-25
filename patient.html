@@ -183,6 +183,13 @@
         ? 0 
         : (parsedPredConf <= 1 ? (parsedPredConf * 100).toFixed(2) : parsedPredConf.toFixed(2));
 
+      // Memeriksa ketersediaan gambar Grad-CAM (dapat berupa Base64 string atau URL)
+      const gradcamImageSrc = result.gradcam_image 
+        ? (result.gradcam_image.startsWith("data:") || result.gradcam_image.startsWith("http") 
+            ? result.gradcam_image 
+            : `data:image/png;base64,${result.gradcam_image}`)
+        : (result.gradcam_url || null);
+
       box.innerHTML = `
         <div class="result-panel">
           <div class="result-header">
@@ -197,16 +204,32 @@
               </div>
             </div>
           </div>
+
           <div>
             <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:var(--text-muted);">
               <span>Tingkat Keyakinan</span><span><strong>${predConfPercent}%</strong></span>
             </div>
             <div class="confidence-bar-track"><div class="confidence-bar-fill" style="width:${predConfPercent}%"></div></div>
           </div>
+
+          ${gradcamImageSrc ? `
+          <!-- SECTION VISUALISASI GRAD-CAM -->
+          <div class="result-section" style="margin-top: 20px; text-align: center;">
+            <h4 style="margin-bottom: 8px;">Visualisasi Area Fokus AI (Grad-CAM)</h4>
+            <div style="display: inline-block; background: #000; padding: 8px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+              <img src="${gradcamImageSrc}" alt="Grad-CAM Visualization" style="max-width: 100%; max-height: 320px; border-radius: 6px; display: block; margin: 0 auto;">
+            </div>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin-top:8px; max-width: 500px; margin-left: auto; margin-right: auto;">
+              *Area berwarna hangat (merah/kuning) menandakan wilayah pada otak yang paling memengaruhi keputusan klasifikasi AI.
+            </p>
+          </div>
+          ` : ""}
+
           <div class="result-grid">
             <div class="result-section"><h4>Ringkasan Temuan</h4><ul>${(info.temuan || []).map(t => `<li>${t}</li>`).join("")}</ul></div>
             <div class="result-section"><h4>Rekomendasi</h4><ul>${(info.rekomendasi || []).map(r => `<li>${r}</li>`).join("")}</ul></div>
           </div>
+
           ${result.gemini_explanation ? `<div class="result-section"><h4>Penjelasan &amp; Langkah Selanjutnya</h4><p style="color:var(--text-muted); font-size:0.9rem; line-height:1.7;">${result.gemini_explanation}</p></div>` : ""}
           <p style="font-size:0.78rem; color:var(--text-muted); margin-top:16px;">Hasil ini adalah opini AI sebagai alat bantu skrining awal, BUKAN diagnosis final. Wajib dikonfirmasi oleh dokter/radiolog yang berwenang.</p>
         </div>`;
