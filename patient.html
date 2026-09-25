@@ -122,17 +122,23 @@
 
     function renderRecords(records) {
       const body = document.getElementById("recordsBody");
-      if (!records.length) {
+      if (!records || !records.length) {
         body.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Belum ada riwayat pemeriksaan.</td></tr>';
         return;
       }
-      body.innerHTML = records.map(r => `
+      body.innerHTML = records.map(r => {
+        const rawConf = r.prediction_confidence ?? r.confidence ?? 0;
+        const parsedConf = parseFloat(rawConf);
+        const confPercent = isNaN(parsedConf) ? "-" : (parsedConf <= 1 ? (parsedConf * 100).toFixed(1) : parsedConf.toFixed(1)) + "%";
+
+        return `
         <tr>
           <td>${r.created_at || "-"}</td>
           <td>${r.prediction_label || "Bukan citra otak"}</td>
-          <td>${r.prediction_confidence ? (r.prediction_confidence * 100).toFixed(1) + "%" : "-"}</td>
+          <td>${confPercent}</td>
           <td>${r.prediction_id ? `<a href="${NeuroCheckAPI.reportUrl(nik, r.prediction_id)}" target="_blank" class="btn btn-outline btn-sm">Unduh PDF</a>` : "-"}</td>
-        </tr>`).join("");
+        </tr>`;
+      }).join("");
     }
 
     async function loadPatient() {
@@ -152,18 +158,37 @@
 
     function renderResult(result) {
       const box = document.getElementById("resultBox");
-      if (!result.valid) {
+      
+      // Pembacaan status & confidence precheck yang aman
+      const isValid = result.valid ?? result.precheck?.is_brain ?? result.precheck?.passed ?? (result.precheck_status === "valid");
+      const rawConfidence = result.precheck_confidence ?? result.precheck?.confidence ?? result.confidence ?? 0;
+      
+      const parsedConf = parseFloat(rawConfidence);
+      const confidencePercent = isNaN(parsedConf) 
+        ? 0 
+        : (parsedConf <= 1 ? (parsedConf * 100).toFixed(1) : parsedConf.toFixed(1));
+
+      if (!isValid) {
         box.innerHTML = `<div class="alert-error">Gambar terdeteksi <strong>BUKAN citra MRI/CT otak</strong>
-          (confidence deteksi otak: ${(result.precheck_confidence * 100).toFixed(1)}%). Coba unggah ulang gambar yang lebih jelas.</div>`;
+          (confidence deteksi otak: ${confidencePercent}%). Coba unggah ulang gambar yang lebih jelas.</div>`;
         return;
       }
+
       const info = result.disease_info || result.info || {};
+      
+      // Pembacaan prediction confidence
+      const rawPredConf = result.prediction_confidence ?? result.confidence ?? 0;
+      const parsedPredConf = parseFloat(rawPredConf);
+      const predConfPercent = isNaN(parsedPredConf) 
+        ? 0 
+        : (parsedPredConf <= 1 ? (parsedPredConf * 100).toFixed(2) : parsedPredConf.toFixed(2));
+
       box.innerHTML = `
         <div class="result-panel">
           <div class="result-header">
             <div>
               <div style="font-size:0.8rem; color:var(--text-muted); font-weight:700;">HASIL ANALISIS AI</div>
-              <div class="result-label">${info.nama_tampilan || result.prediction_label}</div>
+              <div class="result-label">${info.nama_tampilan || result.prediction_label || result.predicted_class}</div>
             </div>
             <div style="text-align:right;">
               <span class="urgency-badge ${urgencyClass(info.urgensi)}">${info.urgensi || ""}</span>
@@ -174,9 +199,9 @@
           </div>
           <div>
             <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:var(--text-muted);">
-              <span>Tingkat Keyakinan</span><span><strong>${(result.prediction_confidence * 100).toFixed(2)}%</strong></span>
+              <span>Tingkat Keyakinan</span><span><strong>${predConfPercent}%</strong></span>
             </div>
-            <div class="confidence-bar-track"><div class="confidence-bar-fill" style="width:${result.prediction_confidence * 100}%"></div></div>
+            <div class="confidence-bar-track"><div class="confidence-bar-fill" style="width:${predConfPercent}%"></div></div>
           </div>
           <div class="result-grid">
             <div class="result-section"><h4>Ringkasan Temuan</h4><ul>${(info.temuan || []).map(t => `<li>${t}</li>`).join("")}</ul></div>
